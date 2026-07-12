@@ -2,8 +2,9 @@ services:
   app:
     image: kaqfa/be_simple_lms-django
     container_name: lms-app
-    command: python manage.py runserver 0.0.0.0:8000
-    # command: tail -f /dev/null
+    entrypoint: >
+      sh -c "pip install celery redis pymongo django-ratelimit && 
+             python manage.py runserver 0.0.0.0:8000"
     volumes:
       - ./code:/code
     ports:
@@ -12,6 +13,9 @@ services:
       - DEBUG=True
     depends_on:
       - database
+      - redis
+      - mongodb
+      - rabbitmq
 
   database:
     image: postgres:16
@@ -26,5 +30,66 @@ services:
     ports:
       - "5436:5432"
 
+  redis:
+    image: redis:7-alpine
+    container_name: lms-redis
+    ports:
+      - "6379:6379"
+
+  mongodb:
+    image: mongo:7
+    container_name: lms-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: lms-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+
+  celery-worker:
+    image: kaqfa/be_simple_lms-django
+    container_name: lms-celery-worker
+    entrypoint: >
+      sh -c "pip install celery redis pymongo django-ratelimit && 
+             celery -A lms worker --loglevel=info"
+    volumes:
+      - ./code:/code
+    environment:
+      - DEBUG=True
+    depends_on:
+      - rabbitmq
+      - database
+
+  celery-beat:
+    image: kaqfa/be_simple_lms-django
+    container_name: lms-celery-beat
+    entrypoint: >
+      sh -c "pip install celery redis pymongo django-ratelimit && 
+             celery -A lms beat --loglevel=info"
+    volumes:
+      - ./code:/code
+    environment:
+      - DEBUG=True
+    depends_on:
+      - rabbitmq
+
+  flower:
+    image: mher/flower:0.9.7
+    container_name: lms-flower
+    command: celery flower --broker=amqp://guest:guest@rabbitmq:5672//
+    ports:
+      - "5555:5555"
+    depends_on:
+      - rabbitmq
+
 volumes:
   pg_data:
+  mongo_data:

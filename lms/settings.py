@@ -1,28 +1,11 @@
-"""
-Django settings untuk Simple LMS - Lab 05: Optimasi Database
-
-Melanjutkan dari Modul 04 (Django ORM) dengan tambahan:
-- Database PostgreSQL (bukan SQLite)
-- Django Silk untuk query profiling
-- Media files untuk ImageField dan FileField
-"""
-
 from pathlib import Path
+from celery.schedules import crontab
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# SECURITY WARNING: jangan gunakan key ini di production!
 SECRET_KEY = "django-insecure-lab05-db-optimization-simple-lms-key-2025"
-
-# SECURITY WARNING: matikan DEBUG di production!
 DEBUG = True
-
 ALLOWED_HOSTS = ['*']
-
-
-# =============================================================================
-# Aplikasi yang terdaftar
-# =============================================================================
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -31,18 +14,13 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "silk",       # Django Silk - query profiling (Modul 05)
-    "courses",    # Aplikasi Simple LMS kita
+    "silk",
+    "courses",
 ]
-
-
-# =============================================================================
-# Middleware
-# =============================================================================
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
-    "silk.middleware.SilkyMiddleware",  # Silk harus di posisi awal (setelah Security)
+    "silk.middleware.SilkyMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -71,37 +49,43 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "lms.wsgi.application"
 
-
-# =============================================================================
-# Database - PostgreSQL (sesuai docker-compose.yml)
-# =============================================================================
-# Berbeda dengan Lab-compliance yang menggunakan SQLite,
-# lab ini menggunakan PostgreSQL agar optimasi index terlihat nyata.
-
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": "lms_db",
         "USER": "postgres",
         "PASSWORD": "postgres",
-        "HOST": "database",  # Nama service di docker-compose.yml
+        "HOST": "database",
         "PORT": "5432",
     }
 }
 
+# Redis Caching Integration
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": "redis://redis:6379/1",
+    }
+}
 
-# =============================================================================
-# Django Silk - Konfigurasi Profiling
-# Akses dashboard di: http://localhost:8000/silk/
-# =============================================================================
+# Celery Implementation
+CELERY_BROKER_URL = "amqp://guest:guest@rabbitmq:5672//"
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_TIMEZONE = "Asia/Jakarta"
 
-SILKY_PYTHON_PROFILER = True   # Aktifkan function-level profiling
-SILKY_META = True              # Track query Silk sendiri (untuk transparansi)
+CELERY_BEAT_SCHEDULE = {
+    'update-stats-every-5-minutes': {
+        'task': 'courses.tasks.update_course_statistics',
+        'schedule': crontab(minute='*/5'),
+    },
+}
 
+# MongoDB Connection String
+MONGODB_URI = "mongodb://mongodb:27017/"
 
-# =============================================================================
-# Password validation
-# =============================================================================
+SILKY_PYTHON_PROFILER = True
+SILKY_META = True
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
@@ -110,23 +94,12 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
-
-# =============================================================================
-# Internationalization
-# =============================================================================
-
 LANGUAGE_CODE = "id"
 TIME_ZONE = "Asia/Jakarta"
 USE_I18N = True
 USE_TZ = True
 
-
-# =============================================================================
-# Static dan Media files
-# =============================================================================
-
 STATIC_URL = "static/"
-
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
