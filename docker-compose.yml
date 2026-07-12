@@ -58,7 +58,8 @@ services:
     image: kaqfa/be_simple_lms-django
     container_name: lms-celery-worker
     entrypoint: >
-      sh -c "pip install celery redis pymongo django-ratelimit && 
+      sh -c "sleep 5 && 
+             pip install celery redis pymongo django-ratelimit && 
              celery -A lms worker --loglevel=info"
     volumes:
       - ./code:/code
@@ -72,7 +73,8 @@ services:
     image: kaqfa/be_simple_lms-django
     container_name: lms-celery-beat
     entrypoint: >
-      sh -c "pip install celery redis pymongo django-ratelimit && 
+      sh -c "sleep 10 && 
+             pip install celery redis pymongo django-ratelimit && 
              celery -A lms beat --loglevel=info"
     volumes:
       - ./code:/code
